@@ -1,10 +1,9 @@
-
 <?php
 require_once __DIR__ . '/../src/Controllers/PaymentController.php';
 
-if (isset($_GET['validate'])) {
+if (isset($_GET['validate-slug'])) {
     $controller = new PaymentController();
-    $controller->validate($_GET['slug'] ?? '', $_GET['email'] ?? '');
+    $controller->validateSlug($_GET['slug'] ?? '');
     exit;
 }
 
@@ -63,7 +62,7 @@ if (isset($_GET['confirm'])) {
   <form id="form" class="hidden">
     <input type="text" name="nome" placeholder="Nome" required><br>
     <input type="text" name="sobrenome" placeholder="Sobrenome" required><br>
-    <input type="email" name="email" readonly><br>
+    <input type="email" name="email" placeholder="E-mail" required><br>
     <button id="btn-pagar" class="btn-primary" type="submit">Pagar</button>
   </form>
 
@@ -86,8 +85,6 @@ if (isset($_GET['confirm'])) {
 <script>
 const params = new URLSearchParams(window.location.search);
 const slug = params.get('slug');
-const email = params.get('email');
-
 const loader = document.getElementById('loader');
 const initialError = document.getElementById('initial-error');
 const form = document.getElementById('form');
@@ -96,42 +93,47 @@ const iframeContainer = document.getElementById('iframe-container');
 const btnPagar = document.getElementById('btn-pagar');
 const confirmarDiv = document.getElementById('confirmar-pagamento');
 
-if (!slug || !email) {
+if (!slug) {
   loader.classList.add('hidden');
   initialError.classList.remove('hidden');
 } else {
-  document.querySelector('input[name="email"]').value = email;
-
-  axios.get(`?validate=1&slug=${slug}&email=${email}`)
-    .then(res => {
+  axios.get(`?validate-slug=1&slug=${slug}`)
+    .then(() => {
       loader.classList.add('hidden');
-      if (res.data.status === 'already_paid') {
-        msg.innerHTML = `<p>${res.data.message}</p><a href="${res.data.redirect_url}" class="btn-primary">Ir para a área de membros</a>`;
-      } else {
-        form.classList.remove('hidden');
-      }
+      form.classList.remove('hidden');
     })
     .catch(err => {
       loader.classList.add('hidden');
-      msg.innerHTML = `<p style="color:red">${err.response?.data?.error || 'Erro inesperado.'}</p>`;
+      msg.innerHTML = `<p style="color:red">${err.response?.data?.error || 'Produto inválido.'}</p>`;
     });
 
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
+    const nome = form.nome.value.trim();
+    const sobrenome = form.sobrenome.value.trim();
+    const email = form.email.value.trim();
+
+    if (!nome || !sobrenome || !email || !email.includes('@')) {
+      msg.innerHTML = "<p style='color:red'>Preencha todos os campos com um e-mail válido.</p>";
+      return;
+    }
+
     btnPagar.innerText = 'Processando...';
     btnPagar.disabled = true;
-    const formData = new FormData(form);
+
     try {
-      const res = await axios.post(`?create=1&slug=${slug}`, {
-        nome: formData.get('nome'),
-        sobrenome: formData.get('sobrenome'),
-        email: email
-      });
+      const res = await axios.post(`?create=1&slug=${slug}`, { nome, sobrenome, email });
       form.classList.add('hidden');
       iframeContainer.innerHTML = `<iframe src="${res.data.checkout_url}"></iframe>`;
       setTimeout(() => confirmarDiv.classList.remove('hidden'), 180000);
     } catch (err) {
-      msg.innerHTML = `<p style="color:red">${err.response?.data?.error || 'Erro ao gerar pagamento.'}</p>`;
+      const erro = err.response?.data?.error || 'Erro ao processar.';
+      if (erro.includes('já comprou')) {
+        msg.innerHTML = `<p>${erro}</p><a href="https://area.membros.com" class="btn-primary">Ir para a área de membros</a>`;
+        form.classList.add('hidden');
+      } else {
+        msg.innerHTML = `<p style="color:red">${erro}</p>`;
+      }
     } finally {
       btnPagar.innerText = 'Pagar';
       btnPagar.disabled = false;
@@ -139,6 +141,7 @@ if (!slug || !email) {
   });
 
   document.getElementById('btn-confirmar').addEventListener('click', async function () {
+    const email = form.email.value;
     msg.innerHTML = 'Verificando pagamento...';
     try {
       const res = await axios.get(`?confirm=1&slug=${slug}&email=${email}`);

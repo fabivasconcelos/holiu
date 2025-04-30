@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  app:
+    container_name: app
+    build:
+      context: .
+    ports:
+      - "9000:80"
+    volumes:
+      - .:/var/www/html
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+  db:
+    container_name: db
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: holiu_db
+      MYSQL_USER: holiu
+      MYSQL_PASSWORD: (9|D2Ig0kXi{.]cK210I
+    ports:
+      - "3307:3306"
+    volumes:
+      - holi-mysql-data:/var/lib/mysql
+
+volumes:
+  holi-mysql-data:

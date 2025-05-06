@@ -9,5 +9,4 @@ RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available
 
 COPY ./public /var/www/html/public
 COPY ./src /var/www/html/src
-COPY ./webhook /var/www/html/webhook
 COPY .env /var/www/html/.env

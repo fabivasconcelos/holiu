@@ -1,166 +1,203 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 require_once __DIR__ . '/../src/Controllers/PaymentController.php';
 
+$controller = new PaymentController();
+
 if (isset($_GET['validate-slug'])) {
-    $controller = new PaymentController();
-    $controller->validateSlug($_GET['slug'] ?? '');
-    exit;
+  $controller->validateSlug($_GET['slug'] ?? '');
+  exit;
+}
+
+if (isset($_GET['validate-buyer'])) {
+  $controller->validateBuyer($_GET['slug'] ?? '', $_GET['email'] ?? '');
+  exit;
+}
+
+if (isset($_GET['validate-payment'])) {
+  $controller->validatePayment($_GET['slug'] ?? '', $_GET['email'] ?? '');
+  exit;
 }
 
 if (isset($_GET['create'])) {
-    $controller = new PaymentController();
-    $controller->create($_GET['slug'] ?? '');
-    exit;
+  $controller->create($_GET['slug'] ?? '');
+  exit;
 }
 
-if (isset($_GET['confirm'])) {
-    $controller = new PaymentController();
-    $controller->confirm($_GET['slug'] ?? '', $_GET['email'] ?? '');
-    exit;
+if (isset($_GET['update'])) {
+  $controller->update();
+  exit;
 }
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
   <meta charset="UTF-8">
   <title>Holi U - Pagamento</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { margin: 0; font-family: 'Inter', sans-serif; }
-    header, footer { padding: 20px; color: white; text-align: center; }
-    header { background-color: #0A4C3E; }
-    header nav span { margin: 0 10px; text-transform: uppercase; font-weight: 500; }
-    footer { background-color: #4DB6AC; }
-    footer input, footer button { padding: 8px; margin: 5px; border: none; border-radius: 4px; }
-    footer button, .btn-primary { background-color: #0A4C3E; color: white; }
-    .container { padding: 40px; text-align: center; }
-    input { padding: 10px; width: 300px; margin: 10px; border-radius: 4px; border: 1px solid #ccc; }
-    .hidden { display: none; }
-    .loading { margin: 40px auto; border: 5px solid #f3f3f3; border-radius: 50%; border-top: 5px solid #0A4C3E; width: 60px; height: 60px; animation: spin 1s linear infinite; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    iframe { width: 100%; height: 600px; border: none; margin-top: 30px; }
-    .btn-primary { padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px; }
-  </style>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
+
 <body>
+  <header>
+    <div class="header-container">
+      <div class="logo">
+        <image src="/logo_inline.png" />
+        </image>
+      </div>
+      <nav class="menu">
+        <a href="#">Mentoria</a>
+        <a href="#">Quem somos</a>
+        <a href="#">Workshops</a>
+        <a href="#">Conteúdo exclusivo</a>
+        <a href="#">Minhas aulas</a>
+        <a href="#">Perfil</a>
+        <a href="#">Comece agora</a>
+      </nav>
+    </div>
+  </header>
+  <div class="container" id="content">
+    <div id="mensagem" class="msg"></div>
+    <div id="loader" class="loading"></div>
 
-<header>
-  <h1>🌿 Holi U</h1>
-  <nav>
-    <span>MENTORIA</span> | <span>QUEM SOMOS</span> | <span>WORKSHOPS</span> |
-    <span>CONTEÚDO EXCLUSIVO</span> | <span>MINHAS AULAS</span> |
-    <span>PERFIL</span> | <span>COMECE AGORA</span>
-  </nav>
-</header>
+    <form id="email-form" class="hidden form">
+      <h2 class="form-title">Antes de continuar</h2>
+      <p class="form-subtitle">Informe seu e-mail para verificarmos sua inscrição</p>
+      <input type="email" name="email" placeholder="Digite seu e-mail" required>
+      <button type="submit" class="btn">Prosseguir</button>
+    </form>
 
-<div class="container" id="content">
-  <div id="initial-error" class="hidden">
-    <p style="color: red;">Pagamento temporariamente indisponível.</p>
+    <form id="payment-form" class="hidden form">
+      <h2 class="form-title">Complete seus dados</h2>
+      <p class="form-subtitle">Preencha para gerar seu link de pagamento</p>
+      <input type="text" name="name" placeholder="Nome" required>
+      <input type="text" name="last_name" placeholder="Sobrenome" required>
+      <button type="submit" class="btn">Pagar agora</button>
+    </form>
+
+    <div id="iframe-container" class="iframe-container hidden"></div>
+
+    <div id="pagamento-confirmado" class="hidden success-box"></div>
   </div>
-  <div id="loader" class="loading"></div>
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-logo">
+        <img src="/logo_inline.png" alt="Holi U" class="logo-img">
+      </div>
 
-  <form id="form" class="hidden">
-    <input type="text" name="nome" placeholder="Nome" required><br>
-    <input type="text" name="sobrenome" placeholder="Sobrenome" required><br>
-    <input type="email" name="email" placeholder="E-mail" required><br>
-    <button id="btn-pagar" class="btn-primary" type="submit">Pagar</button>
-  </form>
+      <div class="footer-menu">
+        <span>Mentoria Exclusiva</span>
+        <span>Cursos e Workshops</span>
+        <span>Mentores na sua casa</span>
+        <span>Conteúdo Digital</span>
+        <span>Sobre nós</span>
+      </div>
 
-  <div id="mensagem"></div>
-  <div id="iframe-container"></div>
-  <div id="confirmar-pagamento" class="hidden">
-    <button id="btn-confirmar" class="btn-primary">Já fez seu pagamento?</button>
-  </div>
-</div>
+      <div class="footer-menu">
+        <span>Fernanda Capobianco</span>
+        <span>Mentores</span>
+        <span>8 Pilares</span>
+        <span>Minhas aulas</span>
+        <span>Meu Perfil</span>
+      </div>
 
-<footer>
-  <p><strong>Fale conosco</strong></p>
-  <input type="text" placeholder="Email"><button>INSCREVER-SE</button><br>
-  <p><a href="#">Facebook</a> | <a href="#">Instagram</a> | <a href="#">TikTok</a></p>
-  <p><a href="#">Termos de serviço</a> | <a href="#">Política de Privacidade</a></p>
-  <p><small>Criado com ❤️ pela Holi U</small></p>
-</footer>
+      <div class="footer-social">
+        <a href="#"><i class="fab fa-facebook-f"></i></a>
+        <a href="#"><i class="fab fa-instagram"></i></a>
+        <a href="#"><i class="fab fa-tiktok"></i></a>
+      </div>
 
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script>
-const params = new URLSearchParams(window.location.search);
-const slug = params.get('slug');
-const loader = document.getElementById('loader');
-const initialError = document.getElementById('initial-error');
-const form = document.getElementById('form');
-const msg = document.getElementById('mensagem');
-const iframeContainer = document.getElementById('iframe-container');
-const btnPagar = document.getElementById('btn-pagar');
-const confirmarDiv = document.getElementById('confirmar-pagamento');
+      <div class="footer-links">
+        <a href="#">Termos de serviço</a>
+        <a href="#">Política de Privacidade</a>
+      </div>
 
-if (!slug) {
-  loader.classList.add('hidden');
-  initialError.classList.remove('hidden');
-} else {
-  axios.get(`?validate-slug=1&slug=${slug}`)
-    .then(() => {
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script>
+    const slug = new URLSearchParams(window.location.search).get('slug');
+    const loader = document.getElementById('loader');
+    const msg = document.getElementById('mensagem');
+    const emailForm = document.getElementById('email-form');
+    const paymentForm = document.getElementById('payment-form');
+    const iframeContainer = document.getElementById('iframe-container');
+    const confirmacao = document.getElementById('pagamento-confirmado');
+
+    if (!slug) {
       loader.classList.add('hidden');
-      form.classList.remove('hidden');
-    })
-    .catch(err => {
-      loader.classList.add('hidden');
-      msg.innerHTML = `<p style="color:red">${err.response?.data?.error || 'Produto inválido.'}</p>`;
-    });
+      msg.innerHTML = "<p style='color:red'>Nenhum produto foi informado para pagamento.</p>";
+    } else {
+      axios.get(`?validate-slug=1&slug=${slug}`).then(() => {
+        loader.classList.add('hidden');
+        msg.classList.add('hidden');
+        emailForm.classList.remove('hidden');
+      }).catch(err => {
+        loader.classList.add('hidden');
+        msg.innerHTML = `<p style='color:red'>Nenhum produto encontrado para o slug ${slug}</p>`;
+      });
 
-  form.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const nome = form.nome.value.trim();
-    const sobrenome = form.sobrenome.value.trim();
-    const email = form.email.value.trim();
+      emailForm.addEventListener('submit', async e => {
+        e.preventDefault();
+        const email = emailForm.email.value.trim();
+        loader.classList.remove('hidden');
+        msg.classList.add('hidden');
+        msg.innerHTML = '';
+        try {
+          const res = await axios.get(`?validate-buyer=1&slug=${slug}&email=${email}`);
+          loader.classList.add('hidden');
+          if (res.data.success) {
+            msg.innerHTML = `<p>Você já adquiriu este produto.</p><a href="${res.data.redirect_url}" class="btn">Ir para a área de membros</a>`;
+            msg.classList.remove('hidden');
+          } else {
+            emailForm.classList.add('hidden');
+            paymentForm.classList.remove('hidden');
+          }
+        } catch {
+          loader.classList.add('hidden');
+          msg.innerHTML = "<p style='color:red'>Erro ao validar o comprador.</p>";
+        }
+      });
 
-    if (!nome || !sobrenome || !email || !email.includes('@')) {
-      msg.innerHTML = "<p style='color:red'>Preencha todos os campos com um e-mail válido.</p>";
-      return;
+      paymentForm.addEventListener('submit', async e => {
+        e.preventDefault();
+        const name = paymentForm.name.value.trim();
+        const last_name = paymentForm.last_name.value.trim();
+        const email = emailForm.email.value.trim();
+        loader.classList.remove('hidden');
+        msg.innerHTML = '';
+        try {
+          const res = await axios.post(`?create=1&slug=${slug}`, {
+            name,
+            last_name,
+            email
+          });
+          loader.classList.add('hidden');
+          paymentForm.classList.add('hidden');
+          iframeContainer.innerHTML = `<iframe src="${res.data.checkout_url}"></iframe>`;
+          iframeContainer.classList.remove('hidden');
+          const interval = setInterval(async () => {
+            const res = await axios.get(`?validate-payment=1&slug=${slug}&email=${email}`);
+            if (res.data.success) {
+              iframeContainer.classList.add('hidden');
+              confirmacao.classList.remove('hidden');
+              confirmacao.innerHTML = `<p>Seu pagamento foi realizado!<br/> Você receberá instruções para acesso no e-mail ${email}</p><a href="${res.data.redirect_url}" class="btn">Ir para área de membros</a>`;
+              clearInterval(interval);
+            }
+          }, 1000);
+        } catch {
+          loader.classList.add('hidden');
+          msg.innerHTML = "<p style='color:red'>Ocorreu um erro ao processar sua solicitação. Por favor, tente novamente em alguns minutos.</p>";
+        }
+      });
     }
-
-    btnPagar.innerText = 'Processando...';
-    btnPagar.disabled = true;
-
-    try {
-      const res = await axios.post(`?create=1&slug=${slug}`, { nome, sobrenome, email });
-      form.classList.add('hidden');
-      iframeContainer.innerHTML = `<iframe src="${res.data.checkout_url}"></iframe>`;
-      setTimeout(() => confirmarDiv.classList.remove('hidden'), 180000);
-    } catch (err) {
-      const erro = err.response?.data?.error || 'Erro ao processar.';
-      if (erro.includes('já comprou')) {
-        msg.innerHTML = `<p>${erro}</p><a href="https://area.membros.com" class="btn-primary">Ir para a área de membros</a>`;
-        form.classList.add('hidden');
-      } else {
-        msg.innerHTML = `<p style="color:red">${erro}</p>`;
-      }
-    } finally {
-      btnPagar.innerText = 'Pagar';
-      btnPagar.disabled = false;
-    }
-  });
-
-  document.getElementById('btn-confirmar').addEventListener('click', async function () {
-    const email = form.email.value;
-    msg.innerHTML = 'Verificando pagamento...';
-    try {
-      const res = await axios.get(`?confirm=1&slug=${slug}&email=${email}`);
-      if (res.data.status === 'approved') {
-        msg.innerHTML = '<p style="color:green">Seu pagamento foi processado com sucesso! Verifique seu e-mail para acessar o curso.</p>';
-        confirmarDiv.classList.add('hidden');
-      } else {
-        msg.innerHTML = '<p style="color:red">Pagamento não identificado, por favor, realize o pagamento do PIX gerado acima.</p>';
-        confirmarDiv.classList.add('hidden');
-        setTimeout(() => {
-          msg.innerHTML = '';
-          confirmarDiv.classList.remove('hidden');
-        }, 180000);
-      }
-    } catch (err) {
-      msg.innerHTML = '<p style="color:red">Erro ao verificar pagamento.</p>';
-    }
-  });
-}
-</script>
+  </script>
 </body>
+
 </html>

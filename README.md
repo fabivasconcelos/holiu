@@ -3,7 +3,7 @@
 
 Este é um sistema simples em PHP que permite a criação e verificação de pagamentos para cursos com integração ao Mercado Pago e Zapier. Ele possui:
 
-- Verificação automática de pagamento por email e slug do produto
+- Verificação automática de pagamento por email e slug do product
 - Geração de link de pagamento com embed do Mercado Pago
 - Botão de verificação manual do pagamento
 - Layout completo inspirado no design da plataforma Holi U
@@ -16,7 +16,7 @@ Este é um sistema simples em PHP que permite a criação e verificação de pag
 /public/index.php              # Ponto de entrada da aplicação
 /src/Controllers/              # Lógica da API (PaymentController.php)
     └── PaymentController.php
-/src/Models/Produto.php        # Model que interage com o banco de dados
+/src/Models/product.php        # Model que interage com o banco de dados
 /src/Helpers/mercado_pago.php # Geração de link via API do Mercado Pago
 /config.php                    # Carrega variáveis do .env
 /.env                          # Contém credenciais e configurações
@@ -78,7 +78,7 @@ http://localhost:9000/index.php?slug=curso-a&email=teste@exemplo.com
 Você pode simular os cenários de:
 
 - Parâmetros ausentes → mensagem de indisponível
-- Produto inexistente → erro
+- product inexistente → erro
 - E-mail já pagou → botão de área de membros
 - Geração de link de pagamento
 - Verificação manual de pagamento após 3 minutos
@@ -90,18 +90,23 @@ Você pode simular os cenários de:
 ### Banco de dados:
 
 ```sql
-CREATE TABLE produtos (
+CREATE TABLE products (
   id INT AUTO_INCREMENT PRIMARY KEY,
   slug VARCHAR(100) UNIQUE,
-  nome VARCHAR(255),
+  `name` VARCHAR(255),
   podia_id VARCHAR(100),
-  preco DECIMAL(10,2)
+  price DECIMAL(10,2)
 );
 
-CREATE TABLE pagamentos (
+CREATE TABLE payments (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255),
+  last_name VARCHAR(255),
   email VARCHAR(255),
   slug VARCHAR(100),
+  payment_code VARCHAR(100),
+  podia_register_url VARCHAR(255),
+  `status` VARCHAR(100),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```

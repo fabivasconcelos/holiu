@@ -8,7 +8,7 @@ class MercadoPagoService {
         $this->base_url = $config['mercado_pago_api_url'];
     }
 
-    public function consultarPagamento($id) {
+    public function findPaymentById($id) {
         $url = $this->base_url . $id;
         $ch = curl_init($url);
         curl_setopt_array($ch, [

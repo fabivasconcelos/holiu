@@ -1,5 +1,6 @@
 <?php
-function gerarLinkPagamento($nome, $preco, $email, $produtoId) {
+function generatePaymentLink($product_id, $product_name, $product_price, $buyer_name, $buyer_last_name, $buyer_email)
+{
     $config = require __DIR__ . '/../../config.php';
 
     $notificationUrl = $config['notification_url'];
@@ -7,14 +8,20 @@ function gerarLinkPagamento($nome, $preco, $email, $produtoId) {
 
     $data = [
         'items' => [[
-            'title' => $nome,
+            'title' => $product_name,
             'quantity' => 1,
-            'unit_price' => (float)$preco,
+            'unit_price' => (float)$product_price,
             'currency_id' => 'BRL'
         ]],
-        'payer' => ['email' => $email],
+        'payer' => ['email' => $buyer_email],
+        "auto_return" => "approved",
+        "back_urls" => [
+            "success" => $notificationUrl,
+            "pending" => $notificationUrl,
+            "failure" => $notificationUrl
+        ],
         'notification_url' => $notificationUrl,
-        'external_reference' => "$email|$produtoId"
+        'external_reference' => "$buyer_name|$buyer_last_name|$buyer_email|$product_id"
     ];
 
     $ch = curl_init($preferenceUrl);
@@ -29,5 +36,6 @@ function gerarLinkPagamento($nome, $preco, $email, $produtoId) {
     ]);
 
     $response = curl_exec($ch);
+
     return json_decode($response, true)['init_point'] ?? null;
 }

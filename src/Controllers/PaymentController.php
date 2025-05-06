@@ -1,74 +1,167 @@
-
 <?php
-require_once __DIR__ . '/../Models/Produto.php';
-require_once __DIR__ . '/../Helpers/mercado_pago.php';
+require_once __DIR__ . '/../Models/Payment.php';
+require_once __DIR__ . '/../Models/Product.php';
+require_once __DIR__ . '/../Helpers/MercadoPagoHelper.php';
 
-class PaymentController {
-    public function validateSlug($slug) {
-        header('Content-Type: application/json');
+class PaymentController
+{
+    public function validateSlug($slug)
+    {
         if (!$slug) {
             http_response_code(400);
-            echo json_encode(['error' => 'Parâmetro slug obrigatório.']);
-            return;
+            echo json_encode(['success' => false, 'error' => 'Parâmetro slug obrigatório.']);
+            exit;
         }
 
-        $produtoModel = new Produto();
-        $produto = $produtoModel->buscarPorSlug($slug);
-        if (!$produto) {
+        $productModel = new Product();
+        $product = $productModel->findBySlug($slug);
+        if (!$product) {
             http_response_code(404);
-            echo json_encode(['error' => 'Produto não encontrado.']);
-            return;
+            echo json_encode(['success' => false, 'error' => 'Produto não encontrado.']);
+            exit;
         }
-
-        echo json_encode(['message' => 'Produto válido.']);
+        http_response_code(200);
+        echo json_encode(['success' => true, 'message' => 'Produto válido.']);
+        exit;
     }
 
-    public function create($slug) {
+    public function validateBuyer($slug, $email)
+    {
         header('Content-Type: application/json');
-        $produtoModel = new Produto();
-        $produto = $produtoModel->buscarPorSlug($slug);
+
+        if (!$slug || !$email) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Parâmetros obrigatórios ausentes.']);
+            exit;
+        }
+
+        $productModel = new Product();
+        $product = $productModel->findBySlug($slug);
+
+        if (!$product) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Produto não encontrado.']);
+            return;
+        }
+
+        $paymentModel = new Payment();
+
+        http_response_code(200);
+        if ($paymentModel->existsForEmailAndSlug($email, $slug)) {
+            $config = require __DIR__ . '/../../config.php';
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Você já comprou este curso.',
+                'redirect_url' => $config["holiu_member_area_url"]
+            ]);
+            exit;
+        }
+
+        echo json_encode(['success' => false, 'message' => 'Compra não identificada para o comprador e produto informados.']);
+        exit;
+    }
+
+    public function validatePayment($slug, $email)
+    {
+        header('Content-Type: application/json');
+
+        if (!$slug || !$email) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Parâmetros obrigatórios ausentes.']);
+            exit;
+        }
+
+        $productModel = new Product();
+        $product = $productModel->findBySlug($slug);
+
+        if (!$product) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Produto não encontrado.']);
+            return;
+        }
+
+        $paymentModel = new Payment();
+
+        http_response_code(200);
+        if ($paymentModel->existsForEmailAndSlug($email, $slug)) {
+            $payment = $paymentModel->findByEmailAndSlug($email, $slug);
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Pagamento aprovado.',
+                'redirect_url' => $payment["podia_register_url"]
+            ]);
+            exit;
+        }
+
+        echo json_encode(['success' => false, 'message' => 'Compra não identificada para o comprador e produto informados.']);
+        exit;
+    }
+
+    public function update()
+    {
+        $data = $_POST ?: json_decode(file_get_contents('php://input'), true);
+        $payment_code = trim($data['payment_code'] ?? '');
+        $register_url = trim($data['register_url'] ?? '');
+        
+        $paymentModel = new Payment();
+
+        $payment = $paymentModel->exists($payment_code);
+
+        if (!$payment) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Pagamento não encontrado.']);
+            exit;;
+        }
+
+        $paymentModel->updateRegisterURL($payment_code, $register_url);
+        
+        http_response_code(201);
+        echo json_encode(['success' => true, 'message' => "Pagamento atualizado!"]);
+        exit;
+    }
+
+    public function create($slug)
+    {
+        $productModel = new Product();
+        $product = $productModel->findBySlug($slug);
 
         $data = $_POST ?: json_decode(file_get_contents('php://input'), true);
-        $nome = trim($data['nome'] ?? '');
-        $sobrenome = trim($data['sobrenome'] ?? '');
+        $name = trim($data['name'] ?? '');
+        $lastName = trim($data['last_name'] ?? '');
         $email = trim($data['email'] ?? '');
 
-        if (!$produto) {
+        if (!$product) {
             http_response_code(404);
-            echo json_encode(['error' => 'Produto não encontrado.']);
-            return;
+            echo json_encode(['success' => false, 'error' => 'Produto não encontrado.']);
+            exit;;
         }
 
-        if (!$nome || !$sobrenome || !$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (!$name || !$lastName || !$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             http_response_code(400);
-            echo json_encode(['error' => 'Dados inválidos ou incompletos.']);
+            echo json_encode(['success' => false, 'error' => 'Dados inválidos ou incompletos.']);
             return;
         }
 
-        if ($produtoModel->jaComprou($email, $slug)) {
+        $paymentModel = new Payment();
+
+        if ($paymentModel->existsForEmailAndSlug($email, $slug)) {
             http_response_code(409);
-            echo json_encode(['error' => 'Você já comprou este curso.']);
-            return;
+            echo json_encode(['success' => false, 'error' => 'Você já comprou este curso.']);
+            exit;;
         }
 
-        $link = gerarLinkPagamento($produto['nome'], $produto['preco'], $email, $produto['podia_id']);
+        $link = generatePaymentLink($product['podia_id'], $product['name'], $product['price'], $name, $lastName, $email);
 
         if (!$link) {
             http_response_code(500);
-            echo json_encode(['error' => 'Erro ao gerar link de pagamento.']);
-            return;
+            echo json_encode(['success' => false, 'error' => 'Erro ao gerar link de pagamento.']);
+            exit;;
         }
 
-        echo json_encode(['checkout_url' => $link]);
-    }
-
-    public function confirm($slug, $email) {
-        header('Content-Type: application/json');
-        $produtoModel = new Produto();
-        if ($produtoModel->jaComprou($email, $slug)) {
-            echo json_encode(['status' => 'approved']);
-        } else {
-            echo json_encode(['status' => 'not_found']);
-        }
+        http_response_code(201);
+        echo json_encode(['success' => true, 'checkout_url' => $link]);
+        exit;
     }
 }
